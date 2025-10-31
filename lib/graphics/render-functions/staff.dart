@@ -132,6 +132,8 @@ Rect? paintAccidentalsForTone(DrawingContext drawC, Clefs staff, Fifths tone, {b
     accidentals = mainToneAccidentalsMapForFClef[tone]!;
   } else if (staff == Clefs.C) {
     accidentals = mainToneAccidentalsMapForCClef[tone]!;
+  } else if (staff == Clefs.T) {
+    accidentals = mainToneAccidentalsMapForClefLevelled(mainToneAccidentalsMapForGClef, octavesUp: -1)[tone]!;
   }
 
   for (var note in accidentals) {

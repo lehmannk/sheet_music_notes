@@ -7,12 +7,14 @@ const Map<Clefs, Glyph> clefToGlyphMap = {
   Clefs.G: Glyph.gClef,
   Clefs.F: Glyph.fClef,
   Clefs.C: Glyph.cClef,
+  Clefs.T: Glyph.gClef8vb
 };
 
 const Map<Clefs, int> clefToPositionOffsetMap = {
   Clefs.G: 1,
   Clefs.C: 0,
   Clefs.F: -1,
+  Clefs.T: 1,
 };
 
 const Map<NoteLength, Glyph> singleNoteUpByLength = {
@@ -398,3 +400,19 @@ const Map<Fifths, List<NotePosition>> mainToneAccidentalsMapForCClef = {
     NotePosition(tone: BaseTones.C, octave: 2, accidental: Accidentals.flat, length: NoteLength.quarter),
   ],
 };
+
+Map<Fifths, List<NotePosition>> mainToneAccidentalsMapForClefLevelled(Map<Fifths, List<NotePosition>> toneMap,
+    {required int octavesUp}) {
+  Map<Fifths, List<NotePosition>> lowered = {};
+  for (final entry in toneMap.entries) {
+    lowered[entry.key] = entry.value
+        .map((n) => NotePosition(
+              tone: n.tone,
+              accidental: n.accidental,
+              octave: n.octave + octavesUp,
+              length: n.length,
+            ))
+        .toList(growable: false);
+  }
+  return lowered;
+}
