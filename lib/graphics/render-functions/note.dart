@@ -99,6 +99,8 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
           : singleNoteDownByLength[notePosition.length]!)
       : singleNoteHeadByLength[notePosition.length]!;
 
+  paintLedgers(drawC, staff, tone, notePosition);
+
   paintGlyph(
     drawC,
     noteGlyph,
@@ -222,8 +224,6 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
       drawC.currentBeamPointsPerID.remove(note.beams.first.id);
     }
   }
-
-  paintLedgers(drawC, staff, tone, notePosition);
 
   if (shouldPaintAccidental(drawC, staff, notePosition)) {
     final accidentalGlyph = accidentalGlyphMap[notePosition.accidental]!;
