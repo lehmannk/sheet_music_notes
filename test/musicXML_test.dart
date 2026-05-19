@@ -8,9 +8,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
-import 'package:music_notes/musicXML/data.dart';
-import 'package:music_notes/musicXML/parser.dart';
-import 'package:music_notes/graphics/music-line.dart';
+import 'package:sheet_music_notes/musicXML/data.dart';
+import 'package:sheet_music_notes/musicXML/parser.dart';
+import 'package:sheet_music_notes/graphics/music-line.dart';
 import 'package:xml/xml.dart';
 
 void main() {

@@ -3,9 +3,9 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:xml/xml.dart';
 
 import 'package:flutter/services.dart';
-import 'package:music_notes/musicXML/data.dart';
-import 'package:music_notes/musicXML/parser.dart';
-import 'package:music_notes/graphics/music-line.dart';
+import 'package:sheet_music_notes/musicXML/data.dart';
+import 'package:sheet_music_notes/musicXML/parser.dart';
+import 'package:sheet_music_notes/graphics/music-line.dart';
 
 Future<Score> loadXML() async {
   final rawFile = await rootBundle.loadString('hanon-no1-stripped.musicxml');

@@ -15,6 +15,7 @@ GlyphGeometry paintGlyph(DrawingContext drawC, Glyph glyph,
       text: GLYPH_FONTCODE_MAP[glyph],
       style: TextStyle(
         fontFamily: 'Bravura',
+        package: 'sheet_music_notes',
         fontSize: drawC.staffHeight,
         height: 1,
         color: color,

@@ -6,7 +6,7 @@
 
 #include "generated_plugin_registrant.h"
 
-#include <music_notes/music_notes_plugin_c_api.h>
+#include <sheet_music_notes/music_notes_plugin_c_api.h>
 
 void RegisterPlugins(flutter::PluginRegistry* registry) {
   MusicNotesPluginCApiRegisterWithRegistrar(

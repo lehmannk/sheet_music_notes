@@ -17,7 +17,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  music_notes:
+  sheet_music_notes:
     # When depending on this package from a real application you should use:
     #   music_notes: ^x.y.z
     # See https://dart.dev/tools/pub/dependencies#version-constraints
@@ -89,7 +89,7 @@ flutter:
   fonts:
     - family: BravuraText
       fonts:
-        - asset: packages/music_notes/fonts/BravuraText.otf
+        - asset: packages/sheet_music_notes/fonts/BravuraText.otf
     - family: Bravura
       fonts:
-        - asset: packages/music_notes/fonts/Bravura.otf
+        - asset: packages/sheet_music_notes/fonts/Bravura.otf

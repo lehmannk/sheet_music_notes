@@ -3,7 +3,7 @@
 # Run `pod lib lint music_notes.podspec` to validate before publishing.
 #
 Pod::Spec.new do |s|
-  s.name             = 'music_notes'
+  s.name             = 'sheet_music_notes'
   s.version          = '0.0.1'
   s.summary          = 'A new Flutter plugin project.'
   s.description      = <<-DESC

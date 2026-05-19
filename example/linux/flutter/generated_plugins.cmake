@@ -3,7 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  music_notes
+  sheet_music_notes
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
