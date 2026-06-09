@@ -10,13 +10,19 @@ import 'DrawingContext.dart';
 import 'glyph.dart';
 import 'note.dart';
 
-/// Advances to the end of the lines
-paintStaffLines(DrawingContext drawC, bool noAdvance) {
+/// Advances to the end of the lines.
+///
+/// [endX] is the x-coordinate (in the painter's root coordinate space) up to
+/// which the staff lines are drawn. When omitted, the lines extend to the full
+/// width of the canvas (the window width). Pass the right edge of the last
+/// barline here to stop the staff lines at the end of the music.
+paintStaffLines(DrawingContext drawC, bool noAdvance, {double? endX}) {
   final lS = drawC.lS;
   final paint = Paint()..color = Colors.black;
   paint.strokeWidth = lS * ENGRAVING_DEFAULTS.staffLineThickness;
 
-  final lineWidth = drawC.size.width - drawC.canvas.getTranslation().dx;
+  final lineEndX = endX ?? drawC.size.width;
+  final lineWidth = lineEndX - drawC.canvas.getTranslation().dx;
 
   drawC.canvas.drawLine(const Offset(0, 0), Offset(lineWidth, 0), paint);
   drawC.canvas.drawLine(Offset(0, lS * 1), Offset(lineWidth, lS * 1), paint);
@@ -31,8 +37,14 @@ paintStaffLines(DrawingContext drawC, bool noAdvance) {
 
 enum BarLineTypes { regular, lightLight, heavyHeavy, heavyLight, lightHeavy, heavy, dashed, repeatRight, repeatLeft }
 
-/// Does translate to after its width
-paintBarLine(DrawingContext drawC, Barline barline, bool noAdvance) {
+/// Does translate to after its width.
+///
+/// Returns the x-coordinate (in the painter's root coordinate space) of the
+/// visible right edge of the drawn barline. Because the barline strokes are
+/// drawn centred on the current pen position, this right edge lies half a stroke
+/// width left of the post-advance translation. Use this value to make staff
+/// lines stop exactly at the barline instead of overshooting it.
+double paintBarLine(DrawingContext drawC, Barline barline, bool noAdvance) {
   final lS = drawC.lS;
   final thinBarlineWidh = lS * ENGRAVING_DEFAULTS.thinBarlineThickness;
   final paint = Paint()..color = Colors.black;
@@ -45,47 +57,53 @@ paintBarLine(DrawingContext drawC, Barline barline, bool noAdvance) {
     drawC.canvas.save();
   }
 
-  if (barline.barStyle == BarLineTypes.regular) {
-    paint.strokeWidth = thinBarlineWidh;
+  /// Tracks the right edge of the last (right-most) stroke that was drawn.
+  double rightEdge = drawC.canvas.getTranslation().dx;
+
+  /// Draws a vertical barline stroke at the current pen position and records its
+  /// visible right edge (the stroke is centred on the pen, hence + half width).
+  void drawStroke(double strokeWidth) {
+    paint.strokeWidth = strokeWidth;
     drawC.canvas.drawLine(startOffset, endOffset, paint);
+    rightEdge = drawC.canvas.getTranslation().dx + strokeWidth / 2;
+  }
+
+  if (barline.barStyle == BarLineTypes.regular) {
+    drawStroke(thinBarlineWidh);
     drawC.canvas.translate(thinBarlineWidh, 0);
   } else if (barline.barStyle == BarLineTypes.lightLight) {
-    paint.strokeWidth = thinBarlineWidh;
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(thinBarlineWidh);
     drawC.canvas.translate(lS * ENGRAVING_DEFAULTS.barlineSeparation + thinBarlineWidh, 0);
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(thinBarlineWidh);
     drawC.canvas.translate(thinBarlineWidh, 0);
   } else if (barline.barStyle == BarLineTypes.lightHeavy) {
-    paint.strokeWidth = thinBarlineWidh;
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(thinBarlineWidh);
     drawC.canvas.translate(lS * ENGRAVING_DEFAULTS.barlineSeparation + thinBarlineWidh, 0);
-    paint.strokeWidth = lS * ENGRAVING_DEFAULTS.thickBarlineThickness;
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(lS * ENGRAVING_DEFAULTS.thickBarlineThickness);
     drawC.canvas.translate(lS * ENGRAVING_DEFAULTS.thickBarlineThickness, 0);
   } else if (barline.barStyle == BarLineTypes.repeatRight) {
-    paint.strokeWidth = lS * ENGRAVING_DEFAULTS.thickBarlineThickness;
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(lS * ENGRAVING_DEFAULTS.thickBarlineThickness);
     drawC.canvas.translate(lS * ENGRAVING_DEFAULTS.barlineSeparation, 0);
-    paint.strokeWidth = thinBarlineWidh;
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(thinBarlineWidh);
     drawC.canvas.translate(lS * ENGRAVING_DEFAULTS.repeatBarlineDotSeparation, 0);
     paintGlyph(drawC, Glyph.repeatDots);
+    rightEdge = drawC.canvas.getTranslation().dx + lS * GLYPH_ADVANCE_WIDTHS[Glyph.repeatDots]!;
     drawC.canvas.translate(lS * GLYPH_ADVANCE_WIDTHS[Glyph.repeatDots]!, 0);
   } else if (barline.barStyle == BarLineTypes.repeatLeft) {
     paintGlyph(drawC, Glyph.repeatDots);
     drawC.canvas.translate(
         lS * GLYPH_ADVANCE_WIDTHS[Glyph.repeatDots]! + lS * ENGRAVING_DEFAULTS.repeatBarlineDotSeparation, 0);
-    paint.strokeWidth = thinBarlineWidh;
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(thinBarlineWidh);
     drawC.canvas.translate(thinBarlineWidh + lS * ENGRAVING_DEFAULTS.barlineSeparation, 0);
-    paint.strokeWidth = lS * ENGRAVING_DEFAULTS.thickBarlineThickness;
-    drawC.canvas.drawLine(startOffset, endOffset, paint);
+    drawStroke(lS * ENGRAVING_DEFAULTS.thickBarlineThickness);
     drawC.canvas.translate(lS * ENGRAVING_DEFAULTS.thickBarlineThickness, 0);
   }
 
   if (noAdvance) {
     drawC.canvas.restore();
   }
+
+  return rightEdge;
 }
 
 calculateBarlineWidth(DrawingContext drawC, Barline barline) {
