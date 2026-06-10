@@ -13,8 +13,9 @@ class DrawingContext extends MusicLineOptions {
     super.topMargin,
     this.canvas,
     this.size,
-    this.staffsSpacing,
-  )   : _currentAttributes = score.parts.first.measures.first.attributes!,
+    this.staffsSpacing, {
+    this.spacingFactor = 1.0,
+  })   : _currentAttributes = score.parts.first.measures.first.attributes!,
         measuresPerPart = List.filled(
             score.parts.length, List.empty(growable: true),
             growable: false);
@@ -22,6 +23,11 @@ class DrawingContext extends MusicLineOptions {
   final XCanvas canvas;
   final Size size;
   final double staffsSpacing;
+
+  /// Multiplier applied to the stretchable horizontal gaps (between note columns
+  /// and between measures) to justify a line to a forced width. 1.0 keeps the
+  /// natural spacing.
+  final double spacingFactor;
   get lS => getLineSpacing(staffHeight);
   int currentPart = 0;
   int _currentMeasure = 0;
@@ -53,7 +59,8 @@ class DrawingContext extends MusicLineOptions {
       double? topMargin,
       XCanvas? canvas,
       Size? size,
-      double? staffsSpacing}) {
+      double? staffsSpacing,
+      double? spacingFactor}) {
     return DrawingContext(
       score ?? this.score,
       staffHeight ?? this.staffHeight,
@@ -61,6 +68,7 @@ class DrawingContext extends MusicLineOptions {
       canvas ?? this.canvas,
       size ?? this.size,
       staffsSpacing ?? this.staffsSpacing,
+      spacingFactor: spacingFactor ?? this.spacingFactor,
     );
   }
 }

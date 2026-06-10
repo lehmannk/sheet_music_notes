@@ -16,7 +16,7 @@ import 'render-functions/staff.dart';
 
 class MusicLineOptions {
   MusicLineOptions(this.score, this.staffHeight, double topMarginFactor,
-      {this.staffSpacingFactor = 2})
+      {this.staffSpacingFactor = 2, this.lineWidth})
       : topMargin = staffHeight * topMarginFactor;
 
   final Score score;
@@ -24,16 +24,25 @@ class MusicLineOptions {
   final double topMargin;
   final double staffSpacingFactor;
 
+  /// Optional forced width (in painter pixels) the music line should span. When
+  /// set, the staff lines extend to this width and the closing bar line of the
+  /// last measure is right-aligned to it, so several lines rendered with the same
+  /// [lineWidth] end flush on the right. When null the line uses its natural width
+  /// (the right edge of the last bar line).
+  final double? lineWidth;
+
   @override
   bool operator ==(Object other) {
     return other is MusicLineOptions &&
         identical(other.score, score) &&
         other.topMargin == topMargin &&
-        other.staffHeight == staffHeight;
+        other.staffHeight == staffHeight &&
+        other.lineWidth == lineWidth;
   }
 
   @override
-  int get hashCode => staffHeight.hashCode ^ topMargin.hashCode ^ identityHashCode(score);
+  int get hashCode =>
+      staffHeight.hashCode ^ topMargin.hashCode ^ identityHashCode(score) ^ lineWidth.hashCode;
 }
 
 class MusicLine extends StatefulWidget {
@@ -117,7 +126,7 @@ class BackgroundPainter extends CustomPainter {
 
     /// Determine where the music content ends, so that the staff lines stop
     /// there instead of extending to the window width.
-    final contentEndX = calculateMusicLineContentWidth(options, staffsSpacing);
+    final contentEndX = options.lineWidth ?? calculateMusicLineContentWidth(options, staffsSpacing);
 
     if ((drawC.latestAttributes.staves ?? 1) > 1) {
       paintGlyph(
@@ -161,7 +170,8 @@ class ForegroundPainter extends CustomPainter {
     xCanvas.translate(0, options.topMargin);
 
     final drawC = DrawingContext(options.score, options.staffHeight,
-        options.topMargin, xCanvas, size, staffsSpacing);
+        options.topMargin, xCanvas, size, staffsSpacing,
+        spacingFactor: justificationSpacingFactor(options, staffsSpacing));
 
     paintMusicLineContent(drawC, lineSpacing);
   }
@@ -193,11 +203,11 @@ double paintMusicLineContent(DrawingContext drawC, double lineSpacing) {
   measures.forEachIndexed((index, measure) {
     drawC.currentMeasure = index;
     if (index > 0) {
-      drawC.canvas.translate(drawC.lS * 1, 0);
+      drawC.canvas.translate(drawC.lS * drawC.spacingFactor, 0);
     }
     paintMeasure(measure, drawC);
 
-    drawC.canvas.translate(drawC.lS * 1, 0);
+    drawC.canvas.translate(drawC.lS * drawC.spacingFactor, 0);
 
     lastBarlineRightEdge = paintBarLine(drawC, measure.barline, false);
   });
@@ -210,13 +220,15 @@ double paintMusicLineContent(DrawingContext drawC, double lineSpacing) {
 /// of the right edge of the last barline. This is used to limit the staff lines
 /// so they stop at the last barline instead of extending to the window width.
 double calculateMusicLineContentWidth(
-    MusicLineOptions options, double staffsSpacing) {
+    MusicLineOptions options, double staffsSpacing,
+    {double spacingFactor = 1.0}) {
   final recorder = ui.PictureRecorder();
   final measuringCanvas = XCanvas(ui.Canvas(recorder));
   measuringCanvas.translate(0, options.topMargin);
 
   final drawC = DrawingContext(options.score, options.staffHeight,
-      options.topMargin, measuringCanvas, Size.zero, staffsSpacing);
+      options.topMargin, measuringCanvas, Size.zero, staffsSpacing,
+      spacingFactor: spacingFactor);
   final lineSpacing = getLineSpacing(options.staffHeight);
 
   final barlineEndX = paintMusicLineContent(drawC, lineSpacing);
@@ -226,3 +238,38 @@ double calculateMusicLineContentWidth(
 
   return barlineEndX;
 }
+
+/// Computes the spacing stretch factor that justifies the music so its content
+/// spans [MusicLineOptions.lineWidth]. Returns 1.0 when no width is forced or the
+/// line is already at/over the target width.
+///
+/// Only the inter-column and inter-measure gaps scale with the factor, so the
+/// content width is linear in it. Two measuring passes (factor 1 and 2) therefore
+/// pin that line down exactly and the required factor can be solved directly,
+/// spreading the surplus evenly across all gaps.
+double justificationSpacingFactor(MusicLineOptions options, double staffsSpacing) {
+  final target = options.lineWidth;
+  if (target == null) return 1.0;
+  final naturalWidth = calculateMusicLineContentWidth(options, staffsSpacing, spacingFactor: 1.0);
+  if (target <= naturalWidth) return 1.0;
+  final doubledWidth = calculateMusicLineContentWidth(options, staffsSpacing, spacingFactor: 2.0);
+  final gapsWidth = doubledWidth - naturalWidth;
+  if (gapsWidth <= 0) return 1.0;
+  return 1.0 + (target - naturalWidth) / gapsWidth;
+}
+
+/// Measures the natural width (right edge of the last bar line) a [score] needs
+/// when rendered with the given metrics, ignoring any forced
+/// [MusicLineOptions.lineWidth]. Use this to find the widest of several lines so
+/// they can all be rendered at a common width via [MusicLineOptions.lineWidth].
+double measureMusicLineWidth(
+  Score score,
+  double staffHeight, {
+  double topMarginFactor = 1,
+  double staffSpacingFactor = 2,
+}) {
+  final options =
+      MusicLineOptions(score, staffHeight, topMarginFactor, staffSpacingFactor: staffSpacingFactor);
+  return calculateMusicLineContentWidth(options, staffHeight * staffSpacingFactor);
+}
+

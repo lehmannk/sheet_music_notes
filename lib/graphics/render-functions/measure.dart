@@ -71,7 +71,7 @@ paintMeasure(Measure measure, DrawingContext drawC) {
     // TODO: Spacing between columns, currently static, probably needs to be dynamic
     // to justify measures for the whole line
     if (column.isNotEmpty && columnIndex < grid.length - 1) {
-      drawC.canvas.translate(drawC.lS * 1, 0);
+      drawC.canvas.translate(drawC.lS * drawC.spacingFactor, 0);
     }
   });
 
