@@ -8,7 +8,7 @@ import 'package:sheet_music_notes/musicXML/parser.dart';
 import 'package:sheet_music_notes/graphics/music-line.dart';
 
 Future<Score> loadXML() async {
-  final rawFile = await rootBundle.loadString('hanon-no1-stripped.musicxml');
+  final rawFile = await rootBundle.loadString('hanon-no1-stripped_more_accidentals.musicxml');
   final result = parseMusicXML(XmlDocument.parse(rawFile));
   return result;
 }

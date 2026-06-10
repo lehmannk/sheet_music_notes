@@ -60,6 +60,7 @@ flutter:
   #   - images/a_dot_ham.jpeg
   assets:
     - hanon-no1-stripped.musicxml
+    - hanon-no1-stripped_more_accidentals.musicxml
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware

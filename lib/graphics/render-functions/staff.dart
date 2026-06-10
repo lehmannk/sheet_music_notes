@@ -71,6 +71,23 @@ double paintBarLine(DrawingContext drawC, Barline barline, bool noAdvance) {
   if (barline.barStyle == BarLineTypes.regular) {
     drawStroke(thinBarlineWidh);
     drawC.canvas.translate(thinBarlineWidh, 0);
+  } else if (barline.barStyle == BarLineTypes.dashed) {
+    // A dashed bar line: same footprint/advance as a thin bar line, but drawn as a
+    // dashed stroke. Without this branch the dashed style was not rendered at all, so
+    // the music had no visible right boundary and the staff lines (which stop at the
+    // returned right edge) appeared to overshoot the music.
+    paint.strokeWidth = thinBarlineWidh;
+    final double height = endOffset.dy;
+    final double dashLength = lS;
+    final double gapLength = lS / 2;
+    double y = 0;
+    while (y < height) {
+      final double segmentEnd = (y + dashLength) > height ? height : (y + dashLength);
+      drawC.canvas.drawLine(Offset(0, y), Offset(0, segmentEnd), paint);
+      y = segmentEnd + gapLength;
+    }
+    rightEdge = drawC.canvas.getTranslation().dx + thinBarlineWidh / 2;
+    drawC.canvas.translate(thinBarlineWidh, 0);
   } else if (barline.barStyle == BarLineTypes.lightLight) {
     drawStroke(thinBarlineWidh);
     drawC.canvas.translate(lS * ENGRAVING_DEFAULTS.barlineSeparation + thinBarlineWidh, 0);
@@ -113,8 +130,14 @@ calculateBarlineWidth(DrawingContext drawC, Barline barline) {
 
   if (barline.barStyle == BarLineTypes.regular) {
     width = thinBarlineWidh;
+  } else if (barline.barStyle == BarLineTypes.dashed) {
+    width = thinBarlineWidh;
   } else if (barline.barStyle == BarLineTypes.lightLight) {
     width = lS * ENGRAVING_DEFAULTS.barlineSeparation + thinBarlineWidh + thinBarlineWidh;
+  } else if (barline.barStyle == BarLineTypes.lightHeavy) {
+    width = lS * ENGRAVING_DEFAULTS.barlineSeparation +
+        thinBarlineWidh +
+        lS * ENGRAVING_DEFAULTS.thickBarlineThickness;
   } else if (barline.barStyle == BarLineTypes.heavyHeavy) {
     width = lS * ENGRAVING_DEFAULTS.thinThickBarlineSeparation +
         thinBarlineWidh +
