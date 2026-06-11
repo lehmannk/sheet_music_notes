@@ -237,6 +237,10 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
       noAdvance: true,
       color: note.color,
     );
+
+    // Register the accidental so subsequent notes of the same pitch in this
+    // bar can suppress their own sign (carry-over rule).
+    drawC.registerMeasureAccidental(staff, notePosition.tone, notePosition.octave, notePosition.accidental);
   }
 
   drawC.canvas.translate(
@@ -264,17 +268,47 @@ paintRestNote(DrawingContext drawC, RestNote note, {bool noAdvance = false}) {
   drawC.canvas.translate(0, -(drawC.staffHeight + drawC.staffsSpacing) * (note.staff - 1));
 }
 
+/// Returns true when an accidental glyph must be rendered before [note].
+///
+/// Rules (per standard notation, see
+/// https://www.lehrklaenge.de/PHP/Notation/VorzeichenNotation.php):
+/// 1. An accidental written once in a bar carries over to all subsequent notes
+///    of the **same tone and octave** on the same staff within that bar.
+/// 2. It is cancelled only by a natural sign (♮) or the start of a new bar.
+///
+/// This function is **pure** — it does not mutate [drawC].
+/// Callers that actually paint the accidental must follow up with
+/// [DrawingContext.registerMeasureAccidental] so that carry-over tracking stays
+/// consistent for subsequent notes in the same bar.
 bool shouldPaintAccidental(DrawingContext drawC, Clefs staff, NotePosition note) {
   if (note.accidental == Accidentals.none) return false;
 
   final tone = drawC.latestAttributes.key!.fifths;
-  List<NotePosition> alreadyAppliedAccidentals =
+
+  // Key-signature accidentals (statically applied to all relevant pitches).
+  final List<NotePosition> keyAccidentals =
       staff == Clefs.G ? mainToneAccidentalsMapForGClef[tone]! : mainToneAccidentalsMapForFClef[tone]!;
-  final alreadyAppliedAccidentalExists = alreadyAppliedAccidentals.any((accidental) =>
-      accidental.tone == note.tone &&
-      (accidental.accidental == note.accidental || note.accidental == Accidentals.natural));
-  return (!alreadyAppliedAccidentalExists && note.accidental != Accidentals.natural) ||
-      (alreadyAppliedAccidentalExists && note.accidental == Accidentals.natural);
+  final bool inKeySig = keyAccidentals.any((a) =>
+      a.tone == note.tone &&
+      (a.accidental == note.accidental || note.accidental == Accidentals.natural));
+
+  // Within-measure carry-over state for this exact pitch (tone + octave).
+  final Accidentals? measureAcc =
+      drawC.getMeasureAccidental(staff, note.tone, note.octave);
+
+  if (note.accidental == Accidentals.natural) {
+    // A natural is only needed when the note would otherwise be altered —
+    // either by the key signature or by a within-measure accidental.
+    return inKeySig || (measureAcc != null && measureAcc != Accidentals.natural);
+  } else if (measureAcc != null) {
+    // An accidental was already written for this pitch this bar: only repaint
+    // if it differs (e.g. the note changes from sharp to flat mid-bar).
+    return measureAcc != note.accidental;
+  } else {
+    // No within-measure record yet: suppress only if the key signature
+    // already implies this exact accidental.
+    return !inKeySig;
+  }
 }
 
 PitchNoteRenderMeasurements calculateNoteWidth(DrawingContext drawC, PitchNote note) {

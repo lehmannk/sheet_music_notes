@@ -5,6 +5,7 @@ import 'beam.dart';
 import '../music-line.dart';
 import '../../ExtendedCanvas.dart';
 import '../../musicXML/data.dart';
+import '../notes.dart';
 
 class DrawingContext extends MusicLineOptions {
   DrawingContext(
@@ -34,6 +35,8 @@ class DrawingContext extends MusicLineOptions {
   int get currentMeasure => _currentMeasure;
   set currentMeasure(int newMeasure) {
     _currentMeasure = newMeasure;
+    // Reset within-measure accidental carry-over state at every bar line.
+    _measureAccidentals.clear();
     final newMeasureAttributes =
         score.parts[currentPart].measures.elementAt(newMeasure).attributes;
     if (newMeasureAttributes != null) {
@@ -70,5 +73,25 @@ class DrawingContext extends MusicLineOptions {
       staffsSpacing ?? this.staffsSpacing,
       spacingFactor: spacingFactor ?? this.spacingFactor,
     );
+  }
+
+  /// Tracks accidentals explicitly written within the current measure.
+  /// Key: encoded as `(staff.index << 24) | (tone.index << 16) | octave`
+  /// Value: the [Accidentals] that was last written for this pitch in this bar.
+  final Map<int, Accidentals> _measureAccidentals = {};
+
+  static int _accidentalKey(Clefs staff, BaseTones tone, int octave) =>
+      (staff.index << 24) | (tone.index << 16) | octave;
+
+  /// Returns the accidental explicitly set for [tone]/[octave] in the current
+  /// measure on [staff], or `null` if none has been written yet this bar.
+  Accidentals? getMeasureAccidental(Clefs staff, BaseTones tone, int octave) =>
+      _measureAccidentals[_accidentalKey(staff, tone, octave)];
+
+  /// Records that an accidental sign was rendered for [tone]/[octave] on
+  /// [staff] in the current measure so subsequent notes can suppress theirs.
+  void registerMeasureAccidental(
+      Clefs staff, BaseTones tone, int octave, Accidentals accidental) {
+    _measureAccidentals[_accidentalKey(staff, tone, octave)] = accidental;
   }
 }
