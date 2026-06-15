@@ -225,7 +225,20 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
     }
   }
 
-  if (shouldPaintAccidental(drawC, staff, notePosition)) {
+  // Paint a per-note accidental by standard notation rules (key signature +
+  // within-measure carry-over). A coloured feedback note is a `chord` copy drawn at
+  // the exact x of its black target: when the target already drew this accidental the
+  // standard rule suppresses the feedback's, so we additionally repaint it ON TOP in
+  // the feedback colour — but only when the sign is intrinsically required
+  // (out-of-key, or a key-cancelling natural), never for an in-key pitch (which
+  // carries no accidental glyph at all). This colours e.g. a played G♯ in G major
+  // green/red/yellow without re-stating an in-key F♯.
+  final bool standardPaint = shouldPaintAccidental(drawC, staff, notePosition);
+  final bool colourOverlay = note.chord &&
+      note.color != Colors.black &&
+      accidentalIsIntrinsicallyRequired(drawC, staff, notePosition);
+  final bool paintAccidental = standardPaint || colourOverlay;
+  if (paintAccidental) {
     final accidentalGlyph = accidentalGlyphMap[notePosition.accidental]!;
 
     drawC.canvas.translate(-GLYPH_ADVANCE_WIDTHS[accidentalGlyph]! * lS - ENGRAVING_DEFAULTS.barlineSeparation * lS, 0);
@@ -238,9 +251,12 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
       color: note.color,
     );
 
-    // Register the accidental so subsequent notes of the same pitch in this
-    // bar can suppress their own sign (carry-over rule).
-    drawC.registerMeasureAccidental(staff, notePosition.tone, notePosition.octave, notePosition.accidental);
+    // Register the accidental so subsequent notes of the same pitch in this bar can
+    // suppress their own sign (carry-over rule). Feedback (chord) copies are visual
+    // overlays only and must never mutate the carry-over state.
+    if (!note.chord) {
+      drawC.registerMeasureAccidental(staff, notePosition.tone, notePosition.octave, notePosition.accidental);
+    }
   }
 
   drawC.canvas.translate(
@@ -297,6 +313,10 @@ bool shouldPaintAccidental(DrawingContext drawC, Clefs staff, NotePosition note)
       drawC.getMeasureAccidental(staff, note.tone, note.octave);
 
   if (note.accidental == Accidentals.natural) {
+    // A natural already written for this exact pitch this bar carries over, so a
+    // repeated natural (e.g. the target note and its chord/feedback copy on the
+    // same beat) is redundant and must be suppressed.
+    if (measureAcc == Accidentals.natural) return false;
     // A natural is only needed when the note would otherwise be altered —
     // either by the key signature or by a within-measure accidental.
     return inKeySig || (measureAcc != null && measureAcc != Accidentals.natural);
@@ -309,6 +329,29 @@ bool shouldPaintAccidental(DrawingContext drawC, Clefs staff, NotePosition note)
     // already implies this exact accidental.
     return !inKeySig;
   }
+}
+
+/// Whether [note]'s accidental is intrinsically required by the key signature alone,
+/// ignoring any within-measure carry-over. A sharp/flat is required only when it is
+/// **not** already implied by the key signature; a natural is required only when it
+/// **cancels** a key-signature accidental. `Accidentals.none` is never required.
+///
+/// Used to repaint a coloured feedback (chord) overlay on top of its target's black
+/// accidental even after the carry-over rule has suppressed it, without ever drawing
+/// a sign for an in-key pitch.
+bool accidentalIsIntrinsicallyRequired(DrawingContext drawC, Clefs staff, NotePosition note) {
+  if (note.accidental == Accidentals.none) return false;
+
+  final tone = drawC.latestAttributes.key!.fifths;
+  final List<NotePosition> keyAccidentals =
+      staff == Clefs.G ? mainToneAccidentalsMapForGClef[tone]! : mainToneAccidentalsMapForFClef[tone]!;
+  final bool inKeySig = keyAccidentals.any((a) =>
+      a.tone == note.tone &&
+      (a.accidental == note.accidental || note.accidental == Accidentals.natural));
+
+  // A natural is meaningful only if it cancels a key-signature accidental; any other
+  // accidental is meaningful only when the key signature does not already imply it.
+  return note.accidental == Accidentals.natural ? inKeySig : !inKeySig;
 }
 
 PitchNoteRenderMeasurements calculateNoteWidth(DrawingContext drawC, PitchNote note) {
