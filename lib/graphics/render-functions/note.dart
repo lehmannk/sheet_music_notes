@@ -109,7 +109,7 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
     color: note.color,
   );
 
-  if (note.beams.isNotEmpty) {
+  if (note.beams.isNotEmpty && !note.chord) {
     final noteAnchor = GLYPH_ANCHORS[noteGlyph];
 
     final currentBeamPointMapForThisId = drawC.currentBeamPointsPerID[note.beams.first.id] ?? {};
@@ -135,40 +135,81 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
     final openBeams = getOpenBeams(currentBeamPointMapForThisId);
 
     if (openBeams.isEmpty) {
-      for (final beamPoints in currentBeamPointMapForThisId.entries) {
+      // A beam group's slope is defined ONCE by the primary beam (the smallest beam
+      // number, which spans the whole group). Every higher-level (shorter) beam — e.g.
+      // the sixteenth beams inside an eighth+sixteenth group — must run PARALLEL to it,
+      // only shifted outwards by one beam spacing per level. Deriving each level's slope
+      // from its own first/last note (the previous behaviour) tilted secondary beams
+      // independently whenever the inner notes had a different pitch contour.
+      final double levelGap =
+          ENGRAVING_DEFAULTS.beamThickness * lS + ENGRAVING_DEFAULTS.beamSpacing * lS;
+      final sortedEntries = currentBeamPointMapForThisId.entries.toList()
+        ..sort((a, b) => a.key.compareTo(b.key));
+      final int primaryKey = sortedEntries.first.key;
+      final int outerMostKey = sortedEntries.last.key;
+      final BeamPoint primaryFirst = sortedEntries.first.value.first;
+      final BeamPoint primaryLast = sortedEntries.first.value.last;
+      // The primary (longest) beam occupies the OUTERMOST slot so that the
+      // shorter sixteenth beams sit inside it (towards the note heads), as in
+      // standard engraving. The slot depth equals the deepest beam level.
+      final double primaryStemLength = lS * 2 + outerMostKey * levelGap;
+
+      // Outer edge of the primary beam at its first and last note (global coordinates).
+      final Offset primaryStartGlobal;
+      final Offset primaryEndGlobal;
+      if (primaryFirst.drawAbove) {
+        primaryStartGlobal = Offset(
+          primaryFirst.notePosition.dx + primaryFirst.noteAnchor.stemUpSE.dx * lS,
+          primaryFirst.notePosition.dy +
+              (drawC.staffHeight / 2) -
+              primaryStemLength -
+              (ENGRAVING_DEFAULTS.beamThickness * lS) +
+              primaryFirst.noteAnchor.stemUpSE.dy * lS,
+        );
+        primaryEndGlobal = Offset(
+          primaryLast.notePosition.dx + primaryLast.noteAnchor.stemUpSE.dx * lS,
+          primaryLast.notePosition.dy +
+              (drawC.staffHeight / 2) -
+              primaryStemLength -
+              (ENGRAVING_DEFAULTS.beamThickness * lS) +
+              primaryLast.noteAnchor.stemUpSE.dy * lS,
+        );
+      } else {
+        primaryStartGlobal = Offset(
+          primaryFirst.notePosition.dx + primaryFirst.noteAnchor.stemDownNW.dx * lS,
+          primaryFirst.notePosition.dy + (drawC.staffHeight / 2) + primaryStemLength +
+              primaryFirst.noteAnchor.stemDownNW.dy * lS,
+        );
+        primaryEndGlobal = Offset(
+          primaryLast.notePosition.dx + primaryLast.noteAnchor.stemDownNW.dx * lS,
+          primaryLast.notePosition.dy + (drawC.staffHeight / 2) + primaryStemLength +
+              primaryLast.noteAnchor.stemDownNW.dy * lS,
+        );
+      }
+
+      for (final beamPoints in sortedEntries) {
         final BeamPoint start = beamPoints.value.first;
         final BeamPoint end = beamPoints.value.last;
 
-        final double stemLength =
-            lS * 2 + beamPoints.key * (ENGRAVING_DEFAULTS.beamThickness * lS + ENGRAVING_DEFAULTS.beamSpacing * lS);
+        // Higher levels sit one beam spacing closer to the note heads per level
+        // (downwards for stem-up, upwards for stem-down) while keeping the
+        // primary slope, so the longest beam stays on the outside of the group.
+        final double levelShift =
+            beamLevelShift(beamPoints.key, primaryKey, levelGap, start.drawAbove);
 
         Offset startOffset, endOffset;
         if (start.drawAbove) {
-          startOffset = drawC.canvas.globalToLocal(Offset(
-            start.notePosition.dx + start.noteAnchor.stemUpSE.dx * lS,
-            start.notePosition.dy +
-                (drawC.staffHeight / 2) -
-                stemLength -
-                (ENGRAVING_DEFAULTS.beamThickness * lS) +
-                start.noteAnchor.stemUpSE.dy * lS,
-          ));
-          endOffset = drawC.canvas.globalToLocal(Offset(
-            end.notePosition.dx + end.noteAnchor.stemUpSE.dx * lS,
-            end.notePosition.dy +
-                (drawC.staffHeight / 2) -
-                stemLength -
-                (ENGRAVING_DEFAULTS.beamThickness * lS) +
-                end.noteAnchor.stemUpSE.dy * lS,
-          ));
+          final double startX = start.notePosition.dx + start.noteAnchor.stemUpSE.dx * lS;
+          final double endX = end.notePosition.dx + end.noteAnchor.stemUpSE.dx * lS;
+          final (s, e) = parallelBeamSegment(primaryStartGlobal, primaryEndGlobal, startX, endX, levelShift);
+          startOffset = drawC.canvas.globalToLocal(s);
+          endOffset = drawC.canvas.globalToLocal(e);
         } else {
-          startOffset = drawC.canvas.globalToLocal(Offset(
-            start.notePosition.dx + start.noteAnchor.stemDownNW.dx * lS,
-            start.notePosition.dy + (drawC.staffHeight / 2) + stemLength + start.noteAnchor.stemDownNW.dy * lS,
-          ));
-          endOffset = drawC.canvas.globalToLocal(Offset(
-            end.notePosition.dx + end.noteAnchor.stemDownNW.dx * lS,
-            end.notePosition.dy + (drawC.staffHeight / 2) + stemLength + end.noteAnchor.stemDownNW.dy * lS,
-          ));
+          final double startX = start.notePosition.dx + start.noteAnchor.stemDownNW.dx * lS;
+          final double endX = end.notePosition.dx + end.noteAnchor.stemDownNW.dx * lS;
+          final (s, e) = parallelBeamSegment(primaryStartGlobal, primaryEndGlobal, startX, endX, levelShift);
+          startOffset = drawC.canvas.globalToLocal(s);
+          endOffset = drawC.canvas.globalToLocal(e);
         }
 
         paintBeam(drawC, startOffset, endOffset);
