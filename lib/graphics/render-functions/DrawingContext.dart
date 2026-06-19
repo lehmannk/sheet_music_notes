@@ -48,6 +48,23 @@ class DrawingContext extends MusicLineOptions {
   Attributes _currentAttributes;
   Attributes get latestAttributes => _currentAttributes;
   Map<int, Map<int, List<BeamPoint>>> currentBeamPointsPerID = {};
+
+  /// Geometry (canvas-local) of stems and beam lines captured during a base
+  /// beam-group's pass, indexed by `Beam.id`. Reused at the chord-overlay pass
+  /// to overdraw per-note stems in each chord overlay's feedback colour and —
+  /// when every chord overlay in the group shares the same non-black colour —
+  /// to overdraw the connecting beam line(s) in that colour. See the chord
+  /// branch in `note.dart` for the consumer.
+  final Map<int,
+      ({
+        List<({Offset start, Offset end})> stems,
+        List<({Offset start, Offset end})> beams,
+      })> beamSegmentsByID = {};
+
+  /// Feedback colours collected from chord overlays in render order — one per
+  /// chord overlay (i.e. one per note in the beam group).
+  final Map<int, List<Color>> beamChordColorsByID = {};
+
   final List<List<MeasureGeometry>> measuresPerPart;
 
   void debugDrawBB(Rect boundingBox) {

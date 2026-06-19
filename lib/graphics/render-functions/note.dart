@@ -208,6 +208,13 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
         );
       }
 
+      // Per-note stem segments captured from the PRIMARY iteration only (one
+      // entry per note in the group, in note order). The base pass paints
+      // stems again on sub-beam iterations but those are shorter overlays at
+      // the same x — for chord-overlay overdraw we want the full-length stem.
+      final List<({Offset start, Offset end})> capturedStems = [];
+      final List<({Offset start, Offset end})> capturedBeams = [];
+
       for (final beamPoints in sortedEntries) {
         final BeamPoint start = beamPoints.value.first;
         final BeamPoint end = beamPoints.value.last;
@@ -234,6 +241,7 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
         }
 
         paintBeam(drawC, startOffset, endOffset);
+        capturedBeams.add((start: startOffset, end: endOffset));
 
         for (final beamPoint in beamPoints.value) {
           Offset stemOffsetStart, stemOffsetEnd;
@@ -277,13 +285,57 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
           }
 
           paintStem(drawC, stemOffsetStart, stemOffsetEnd);
+          if (beamPoints.key == primaryKey) {
+            capturedStems.add((start: stemOffsetStart, end: stemOffsetEnd));
+          }
         }
       }
+
+      // Stash the just-drawn geometry so the chord-overlay pass for this same
+      // beam group can repaint the stems in each feedback colour and — when
+      // all overlays agree on one non-black colour — the connecting beam(s).
+      drawC.beamSegmentsByID[note.beams.first.id] =
+          (stems: capturedStems, beams: capturedBeams);
 
       // Everything has been drawn, now it is time to reset the
       // beam context list, so that it is ready for the next
       // beam group that might come.
       drawC.currentBeamPointsPerID.remove(note.beams.first.id);
+    }
+  }
+
+  // Chord (feedback) overlay for a beamed note: the base pass already drew the
+  // stem and beam line(s) in black. We overdraw the stem of *this* overlay in
+  // its feedback colour, and — once every overlay in the group has been
+  // collected and they all share a single non-black colour — overdraw the
+  // connecting beam(s) too. Mixed groups (different colours, or any black) keep
+  // the original black beam, matching the "colour only when the whole group is
+  // complete" rule. Trainer is single-voice, so matching by `Beam.id` alone is
+  // unambiguous; multi-voice would need to disambiguate by voice as well.
+  if (note.beams.isNotEmpty && note.chord) {
+    final beamId = note.beams.first.id;
+    final colors = drawC.beamChordColorsByID.putIfAbsent(beamId, () => []);
+    colors.add(note.color);
+
+    final segments = drawC.beamSegmentsByID[beamId];
+    if (segments != null && colors.length == segments.stems.length) {
+      for (var i = 0; i < segments.stems.length; i++) {
+        final color = colors[i];
+        if (color != Colors.black) {
+          paintStem(drawC, segments.stems[i].start, segments.stems[i].end, color: color);
+        }
+      }
+
+      final uniformColor =
+          colors.every((c) => c != Colors.black && c == colors.first) ? colors.first : null;
+      if (uniformColor != null) {
+        for (final beamSeg in segments.beams) {
+          paintBeam(drawC, beamSeg.start, beamSeg.end, color: uniformColor);
+        }
+      }
+
+      drawC.beamSegmentsByID.remove(beamId);
+      drawC.beamChordColorsByID.remove(beamId);
     }
   }
 

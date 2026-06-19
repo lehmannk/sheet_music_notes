@@ -70,9 +70,9 @@ double beamLevelShift(int key, int primaryKey, double levelGap, bool drawAbove) 
   return (Offset(startX, y(startX)), Offset(endX, y(endX)));
 }
 
-paintBeam(DrawingContext drawC, Offset start, Offset end) {
+paintBeam(DrawingContext drawC, Offset start, Offset end, {Color color = Colors.black}) {
   final Paint paint = Paint();
-  paint.color = Colors.black;
+  paint.color = color;
   paint.strokeWidth = 0;
   paint.style = PaintingStyle.fill;
 
@@ -86,9 +86,9 @@ paintBeam(DrawingContext drawC, Offset start, Offset end) {
   drawC.canvas.drawPath(path, paint);
 }
 
-paintStem(DrawingContext drawC, Offset start, Offset end) {
+paintStem(DrawingContext drawC, Offset start, Offset end, {Color color = Colors.black}) {
   final Paint paint = Paint();
-  paint.color = Colors.black;
+  paint.color = color;
   paint.strokeWidth = ENGRAVING_DEFAULTS.stemThickness * drawC.lS;
 
   drawC.canvas.drawLine(start, end, paint);
