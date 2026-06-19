@@ -5,6 +5,7 @@ import '../generated/engraving-defaults.dart';
 import '../generated/glyph-advance-widths.dart';
 import '../generated/glyph-anchors.dart';
 import '../generated/glyph-bboxes.dart';
+import '../generated/glyph-definitions.dart';
 import '../generated/glyph-range-definitions.dart';
 import '../notes.dart';
 import 'DrawingContext.dart';
@@ -108,6 +109,26 @@ paintPitchNote(DrawingContext drawC, PitchNote note, {bool noAdvance = false}) {
     noAdvance: true,
     color: note.color,
   );
+
+  // Augmentation dot(s): each dot lengthens the previous duration by half. Drawn just
+  // right of the note head with a small gap, then dot-to-dot at the same spacing. A note
+  // on a staff line (even half-line-space offset) places its dot in the space above
+  // (standard engraving); a note already in a space keeps the dot on the same y.
+  if (note.dots > 0) {
+    final headWidth = GLYPH_ADVANCE_WIDTHS[singleNoteHeadByLength[notePosition.length]!]! * lS;
+    final dotWidth = GLYPH_ADVANCE_WIDTHS[Glyph.augmentationDot]! * lS;
+    const dotGapInLineSpaces = 0.25;
+    final dotGap = dotGapInLineSpaces * lS;
+    final dotYHalfSpaces = offset.isEven ? offset - 1 : offset;
+    final dotYOffset = (lS / 2) * dotYHalfSpaces;
+    drawC.canvas.save();
+    drawC.canvas.translate(headWidth + dotGap, 0);
+    for (var i = 0; i < note.dots; i++) {
+      paintGlyph(drawC, Glyph.augmentationDot, yOffset: dotYOffset, noAdvance: true, color: note.color);
+      drawC.canvas.translate(dotWidth + dotGap, 0);
+    }
+    drawC.canvas.restore();
+  }
 
   if (note.beams.isNotEmpty && !note.chord) {
     final noteAnchor = GLYPH_ANCHORS[noteGlyph];
@@ -412,6 +433,17 @@ PitchNoteRenderMeasurements calculateNoteWidth(DrawingContext drawC, PitchNote n
   double rightBorder = GLYPH_ADVANCE_WIDTHS[noteGlyph]! * lineSpacing;
   double topBorder = (lineSpacing / 2) * offset + GLYPH_BBOXES[noteGlyph]!.northEast.dy;
   double bottomBorder = (lineSpacing / 2) * offset + GLYPH_BBOXES[noteGlyph]!.northEast.dy;
+
+  // Augmentation dots add to the note's right-hand footprint so the next column does
+  // not overlap them (head width + N × (gap + dot width)).
+  if (note.dots > 0) {
+    final headWidth = GLYPH_ADVANCE_WIDTHS[singleNoteHeadByLength[notePosition.length]!]! * lineSpacing;
+    final dotWidth = GLYPH_ADVANCE_WIDTHS[Glyph.augmentationDot]! * lineSpacing;
+    const dotGapInLineSpaces = 0.25;
+    final dotGap = dotGapInLineSpaces * lineSpacing;
+    final dottedRight = headWidth + note.dots * (dotGap + dotWidth);
+    if (dottedRight > rightBorder) rightBorder = dottedRight;
+  }
 
   if (shouldPaintAccidental(drawC, staff, notePosition)) {
     final accidentalGlyph = accidentalGlyphMap[notePosition.accidental]!;
