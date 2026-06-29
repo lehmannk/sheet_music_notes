@@ -393,7 +393,7 @@ paintRestNote(DrawingContext drawC, RestNote note, {bool noAdvance = false}) {
   var restGlyph = GLYPHRANGE_MAP[GlyphRange.rests]!
       .glyphs[durationToRestLengthIndex(drawC, note.duration).round() + 3]; // whole rest begins at index 3
 
-  paintGlyph(drawC, restGlyph, noAdvance: noAdvance);
+  paintGlyph(drawC, restGlyph, noAdvance: noAdvance, color: note.color);
 
   drawC.canvas.translate(0, -(drawC.staffHeight + drawC.staffsSpacing) * (note.staff - 1));
 }

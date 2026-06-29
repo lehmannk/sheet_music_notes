@@ -186,45 +186,45 @@ Rect calculateColumnAlignment(
       case RestNote:
       case PitchNote:
         {
-          if (element is PitchNote) {
-            currentColumn.add(element);
-            if (index < measure.contents.length - 1) {
-              final nextElement = measure.contents.elementAt(index + 1);
-              if (nextElement is PitchNote) {
-                element.beams
-                    .toList(); // This makes the lazy xml parser actually traverse all beams
-                if (!element.chord) {
-                  if (nextElement.chord) {
-                    // next element is chord note, so we save the current
-                    chordDuration = element.duration;
-                  } else {
-                    currentColumnPointer += element.duration;
-                  }
-                } else {
-                  if (!nextElement.chord) {
-                    // next element is not a chord note anymore, so apply saved chordDuration
-                    if (chordDuration == null) {
-                      throw const FormatException(
-                          'End of a chord reached, should have chordDuration, but is null.');
-                    }
-                    currentColumnPointer += chordDuration!;
-                    chordDuration = null;
-                  }
-                }
-              } else {
-                currentColumnPointer += element.duration;
-              }
+          final note = element as Note;
+          if (note is PitchNote) {
+            note.beams
+                .toList(); // This makes the lazy xml parser actually traverse all beams
+          }
+
+          // A whole-bar rest is centred via [positioned]; every other note/rest is placed in
+          // the current rhythmic column. Chord members (incl. a feedback rest copy) share the
+          // column/position of the target they overlap.
+          final isWholeBarRest =
+              note is RestNote && columnsOnCurrentTime / note.duration == 1;
+          if (isWholeBarRest) {
+            positioned.add(XPositionedMeasureContent(
+                xPosition: 0.5, measureContent: note));
+          } else {
+            currentColumn.add(note);
+          }
+
+          // The rhythmic grid only advances when the current chord group ends. A chord note
+          // overlaps the preceding note at the same x and never advances; the deferred
+          // duration (the target's) is applied once the next non-chord element begins. This
+          // is what keeps a target/feedback pair (note OR rest) on a single rhythmic column.
+          final nextElement = index < measure.contents.length - 1
+              ? measure.contents.elementAt(index + 1)
+              : null;
+          final nextIsChordNote = nextElement is Note && nextElement.chord;
+          if (!note.chord) {
+            if (nextIsChordNote) {
+              chordDuration = note.duration;
             } else {
-              currentColumnPointer += element.duration;
+              currentColumnPointer += note.duration;
             }
-          } else if (element is RestNote) {
-            if (columnsOnCurrentTime / element.duration == 1) {
-              positioned.add(XPositionedMeasureContent(
-                  xPosition: 0.5, measureContent: element));
-            } else {
-              currentColumn.add(element);
+          } else if (!nextIsChordNote) {
+            if (chordDuration == null) {
+              throw const FormatException(
+                  'End of a chord reached, should have chordDuration, but is null.');
             }
-            currentColumnPointer += element.duration;
+            currentColumnPointer += chordDuration!;
+            chordDuration = null;
           }
           break;
         }

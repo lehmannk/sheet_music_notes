@@ -189,24 +189,37 @@ class MusicalKey {
 }
 
 abstract class Note extends MeasureContent {
-  Note(this.duration, this.voice, this.staff, this.notations);
+  Note(this.duration, this.voice, this.staff, this.notations, {this.chord = false, this.color = Colors.black});
 
   final int duration;
   final int voice;
   int staff;
   final List<Notation> notations;
 
+  /// Whether this note overlaps the preceding note at the same x-position (a chord member or,
+  /// in the trainer, the feedback copy of a target). Chord notes never advance the rhythmic
+  /// grid (see `createGridForMeasure`).
+  final bool chord;
+
+  /// Render colour of the note/rest glyph. Mutable so feedback overlays can be recoloured
+  /// after evaluation.
+  Color color;
+
   NotePosition get notePosition;
 }
 
 class RestNote extends Note {
-  RestNote(super.duration, super.voice, super.staff, super.notations);
+  RestNote(super.duration, super.voice, super.staff, super.notations,
+      {this.type = NoteLength.quarter, this.dots = 0, super.chord, super.color});
 
-  // TODO(Kai): these are just default values yet
+  final NoteLength type;
+  final int dots;
+
+  // TODO(Kai): tone/octave are still placeholders; only [length] reflects the actual rest value.
   @override
-  NotePosition get notePosition => const NotePosition(
+  NotePosition get notePosition => NotePosition(
         tone: BaseTones.C,
-        length: NoteLength.quarter,
+        length: type,
         octave: 0,
         accidental: Accidentals.none,
       );
@@ -214,15 +227,13 @@ class RestNote extends Note {
 
 class PitchNote extends Note {
   PitchNote(super.duration, super.voice, super.staff, super.notations, this.pitch, this.type, this.stem, this.beams,
-      {this.dots = 0, this.chord = false, this.color = Colors.black});
+      {this.dots = 0, super.chord, super.color});
 
   final NoteLength type;
   final List<Beam> beams;
   final int dots;
-  final bool chord;
   Pitch pitch;
   StemValue stem;
-  Color color;
 
   @override
   NotePosition get notePosition => NotePosition(
