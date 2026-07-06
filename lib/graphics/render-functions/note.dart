@@ -410,6 +410,36 @@ paintRestNote(DrawingContext drawC, RestNote note, {bool noAdvance = false}) {
 /// Callers that actually paint the accidental must follow up with
 /// [DrawingContext.registerMeasureAccidental] so that carry-over tracking stays
 /// consistent for subsequent notes in the same bar.
+/// Vertical extent (top, bottom) of a highlighted note's full drawn ink — note head, stem
+/// and ledger lines — expressed in the highlight band's coordinate frame (y = 0 at the
+/// staff top line, `staffHeight` at the bottom line). It is used only to *grow* the band
+/// beyond its default staff-anchored frame for notes that reach onto ledger lines, so the
+/// near-side stem (which always stays within the staff) is deliberately left to the default
+/// frame — the returned near-side bound may therefore be less extreme than the real ink.
+///
+/// The bounds are an empirical linear fit against the note's diatonic [offset] from the
+/// clef's standard note (verified by `note_highlight_band_test.dart`): the topmost ink
+/// tracks `0.5 * offset` line-spaces (matching the half-space diatonic ledger step) and the
+/// bottommost ink tracks `0.5 * offset + 2.9` (the extra ~2.9 being the note head reaching
+/// below its reference line). Deriving this from `GLYPH_BBOXES` proved unreliable because
+/// the embedded Bravura metrics and the ledger placement do not agree to the pixel.
+/// Accidentals never reach beyond the head/ledger ink vertically, so they need no term here
+/// (the column width covers them horizontally). The per-staff base offset is added for
+/// multi-staff systems.
+(double top, double bottom) noteVerticalExtent(DrawingContext drawC, PitchNote note) {
+  final lS = drawC.lS;
+  final staff = drawC.latestAttributes.clefs!
+      .firstWhere((clef) => clef.staffNumber == note.staff)
+      .sign;
+  final offset = calculateYOffsetForNote(staff, note.notePosition.positionalValue);
+  final staffBase = (drawC.staffHeight + drawC.staffsSpacing) * (note.staff - 1);
+
+  final top = 0.5 * offset * lS;
+  final bottom = (0.5 * offset + 2.9) * lS;
+
+  return (staffBase + top, staffBase + bottom);
+}
+
 bool shouldPaintAccidental(DrawingContext drawC, Clefs staff, NotePosition note) {
   if (note.accidental == Accidentals.none) return false;
 

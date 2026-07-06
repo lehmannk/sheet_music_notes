@@ -188,8 +188,31 @@ class MusicalKey {
   final KeyMode? mode;
 }
 
+/// Visual styles for [NoteHighlight]. The highlight is a purely decorative marker used to
+/// point out a single note (e.g. the trainer's "next note to play") without recolouring the
+/// glyph itself.
+enum NoteHighlightStyle {
+  /// A filled, translucent band spanning the note's column (up to the middle of the gap to the
+  /// neighbouring notes), drawn behind the glyph.
+  background,
+
+  /// A slim cursor / caret drawn above the note's column.
+  cursor,
+}
+
+/// Optional decorative highlight of a single [Note]. Defaults to absent; when set, [paintMeasure]
+/// draws the [style] in [color] behind/around the note. Being purely visual it never affects
+/// layout, accidental carry-over or grading.
+class NoteHighlight {
+  const NoteHighlight(this.style, this.color);
+
+  final NoteHighlightStyle style;
+  final Color color;
+}
+
 abstract class Note extends MeasureContent {
-  Note(this.duration, this.voice, this.staff, this.notations, {this.chord = false, this.color = Colors.black});
+  Note(this.duration, this.voice, this.staff, this.notations,
+      {this.chord = false, this.color = Colors.black, this.highlight});
 
   final int duration;
   final int voice;
@@ -205,12 +228,16 @@ abstract class Note extends MeasureContent {
   /// after evaluation.
   Color color;
 
+  /// Optional decorative band/cursor marker (see [NoteHighlight]). Mutable so a moving cursor
+  /// (e.g. the trainer's next-note marker) can be set and cleared in place.
+  NoteHighlight? highlight;
+
   NotePosition get notePosition;
 }
 
 class RestNote extends Note {
   RestNote(super.duration, super.voice, super.staff, super.notations,
-      {this.type = NoteLength.quarter, this.dots = 0, super.chord, super.color});
+      {this.type = NoteLength.quarter, this.dots = 0, super.chord, super.color, super.highlight});
 
   final NoteLength type;
   final int dots;
@@ -227,7 +254,7 @@ class RestNote extends Note {
 
 class PitchNote extends Note {
   PitchNote(super.duration, super.voice, super.staff, super.notations, this.pitch, this.type, this.stem, this.beams,
-      {this.dots = 0, super.chord, super.color});
+      {this.dots = 0, super.chord, super.color, super.highlight});
 
   final NoteLength type;
   final List<Beam> beams;

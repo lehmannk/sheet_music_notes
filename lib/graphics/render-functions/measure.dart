@@ -27,8 +27,30 @@ paintMeasure(Measure measure, DrawingContext drawC) {
   grid.forEachIndexed((columnIndex, column) {
     final measurements = column
         .whereType<PitchNote>()
-        .map((element) => calculateNoteWidth(drawC, element));
+        .map((element) => calculateNoteWidth(drawC, element))
+        .toList();
     final alignmentOffset = calculateColumnAlignment(drawC, measurements);
+
+    // Decorative next-note marker: drawn first so a background band sits behind the glyphs
+    // (but above the already-painted staff lines) and a cursor overlays the column. The target
+    // note and its overlapping feedback chord copy share this column, so one marker suffices.
+    final highlightNote =
+        column.whereType<Note>().firstWhereOrNull((note) => note.highlight != null);
+    if (highlightNote != null) {
+      final contentWidth = alignmentOffset.right - alignmentOffset.left;
+      final halfGap = drawC.lS * drawC.spacingFactor / 2;
+      // Full vertical ink extent (head + stem + accidental) of the highlighted note in the
+      // band's coordinate frame (y = 0 at the staff top line). Used to grow the band/cursor
+      // so it fully encloses notes whose head/stem sit far above or below the staff on
+      // ledger lines. Null for rest highlights (no pitched extent).
+      (double, double)? noteExtent;
+      if (highlightNote is PitchNote) {
+        noteExtent = noteVerticalExtent(drawC, highlightNote);
+      }
+      paintNoteHighlight(
+          drawC, highlightNote.highlight!, contentWidth, halfGap, noteExtent);
+    }
+
     drawC.canvas.translate(alignmentOffset.left.abs(), 0);
     column.forEachIndexed((index, measureContent) {
       bool isLastElement = index == column.length - 1;
@@ -129,6 +151,78 @@ paintMeasure(Measure measure, DrawingContext drawC) {
     // drawC.debugDrawBB(attributesGeom!.boundingBox);
   }
   drawC.measuresPerPart[drawC.currentPart].add(measureGeom);
+}
+
+/// Draws the decorative next-note [highlight] for the current column. The canvas is expected to
+/// be translated so that local x = 0 is the column's left edge and local y = 0 the top staff
+/// line. [contentWidth] is the column's visual width (leftmost to rightmost glyph extent) and
+/// [halfGap] half the spacing to the neighbouring columns, so a background band reaches to the
+/// middle of the gap on either side. Purely visual: it never advances the canvas.
+void paintNoteHighlight(
+    DrawingContext drawC, NoteHighlight highlight, double contentWidth, double halfGap,
+    (double top, double bottom)? noteExtent) {
+  final lS = drawC.lS;
+  final staves = drawC.latestAttributes.staves ?? 1;
+  final blockHeight =
+      drawC.staffHeight * staves + drawC.staffsSpacing * (staves - 1);
+  // Small breathing space so the border never sits directly on the glyph ink.
+  final pad = lS * 0.35;
+
+  drawC.canvas.save();
+  switch (highlight.style) {
+    case NoteHighlightStyle.background:
+      final margin = lS * 1.5;
+      // The staff-anchored frame is the default bound; grow it outward so the whole note
+      // (head, stem and accidental) stays enclosed when it reaches beyond that frame.
+      double top = -margin;
+      double bottom = blockHeight + margin;
+      if (noteExtent != null) {
+        final noteTop = noteExtent.$1 - pad;
+        final noteBottom = noteExtent.$2 + pad;
+        if (noteTop < top) top = noteTop;
+        if (noteBottom > bottom) bottom = noteBottom;
+      }
+      final rect = Rect.fromLTRB(-halfGap, top, contentWidth + halfGap, bottom);
+      final rrect = RRect.fromRectAndRadius(rect, Radius.circular(lS * 0.4));
+      drawC.canvas.drawRRect(
+          rrect, Paint()..color = highlight.color.withValues(alpha: 0.16));
+      drawC.canvas.drawRRect(
+          rrect,
+          Paint()
+            ..color = highlight.color.withValues(alpha: 0.55)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = lS * 0.12);
+      break;
+    case NoteHighlightStyle.cursor:
+      final centerX = contentWidth / 2;
+      double caretTop = -lS * 2.4;
+      double lineBottom = blockHeight + lS * 0.5;
+      // Extend the cursor so it still spans very high / very low notes (head + stem).
+      if (noteExtent != null) {
+        final caretHeight = lS * 0.95;
+        final noteTop = noteExtent.$1 - pad - caretHeight;
+        final noteBottom = noteExtent.$2 + pad;
+        if (noteTop < caretTop) caretTop = noteTop;
+        if (noteBottom > lineBottom) lineBottom = noteBottom;
+      }
+      final caretBottom = caretTop + lS * 0.95;
+      final caretHalfWidth = lS * 0.6;
+      drawC.canvas.drawLine(
+          Offset(centerX, caretBottom),
+          Offset(centerX, lineBottom),
+          Paint()
+            ..color = highlight.color.withValues(alpha: 0.75)
+            ..strokeWidth = lS * 0.18
+            ..strokeCap = StrokeCap.round);
+      final caret = Path()
+        ..moveTo(centerX - caretHalfWidth, caretTop)
+        ..lineTo(centerX + caretHalfWidth, caretTop)
+        ..lineTo(centerX, caretBottom)
+        ..close();
+      drawC.canvas.drawPath(caret, Paint()..color = highlight.color);
+      break;
+  }
+  drawC.canvas.restore();
 }
 
 Rect calculateColumnAlignment(
