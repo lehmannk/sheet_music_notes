@@ -26,8 +26,10 @@ paintMeasure(Measure measure, DrawingContext drawC) {
 
   grid.forEachIndexed((columnIndex, column) {
     final measurements = column
-        .whereType<PitchNote>()
-        .map((element) => calculateNoteWidth(drawC, element))
+        .whereType<Note>()
+        .map((element) => element is PitchNote
+            ? calculateNoteWidth(drawC, element)
+            : calculateRestWidth(drawC, element as RestNote))
         .toList();
     final alignmentOffset = calculateColumnAlignment(drawC, measurements);
 

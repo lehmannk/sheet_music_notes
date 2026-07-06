@@ -387,13 +387,25 @@ double durationToRestLengthIndex(DrawingContext drawC, int duration) {
   return ((drawC.latestAttributes.divisions! * 4) / duration) / 2;
 }
 
+/// Selects the rest glyph for [note]'s duration (whole rest begins at index 3).
+Glyph restGlyphForNote(DrawingContext drawC, RestNote note) =>
+    GLYPHRANGE_MAP[GlyphRange.rests]!
+        .glyphs[durationToRestLengthIndex(drawC, note.duration).round() + 3];
+
+/// Horizontal footprint of a rest, mirroring [calculateNoteWidth] for pitched notes: the
+/// glyph is painted from x = 0 and advances by its glyph width, so the box is
+/// `[0, advanceWidth]`. This lets rest columns contribute a real content width to
+/// [calculateColumnAlignment], so the next-note highlight band wraps the rest symmetrically
+/// instead of collapsing to a zero-width column centred on the origin.
+PitchNoteRenderMeasurements calculateRestWidth(DrawingContext drawC, RestNote note) {
+  final width = GLYPH_ADVANCE_WIDTHS[restGlyphForNote(drawC, note)]! * drawC.lS;
+  return PitchNoteRenderMeasurements(Rect.fromLTRB(0, 0, width, 0), null);
+}
+
 paintRestNote(DrawingContext drawC, RestNote note, {bool noAdvance = false}) {
   drawC.canvas.translate(0, (drawC.staffHeight + drawC.staffsSpacing) * (note.staff - 1));
 
-  var restGlyph = GLYPHRANGE_MAP[GlyphRange.rests]!
-      .glyphs[durationToRestLengthIndex(drawC, note.duration).round() + 3]; // whole rest begins at index 3
-
-  paintGlyph(drawC, restGlyph, noAdvance: noAdvance, color: note.color);
+  paintGlyph(drawC, restGlyphForNote(drawC, note), noAdvance: noAdvance, color: note.color);
 
   drawC.canvas.translate(0, -(drawC.staffHeight + drawC.staffsSpacing) * (note.staff - 1));
 }

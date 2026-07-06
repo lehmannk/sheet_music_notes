@@ -21,6 +21,19 @@ PitchNote note(BaseTones tone, int octave, StemValue stem, [int? alter]) =>
     PitchNote(1, 1, 1, [], Pitch(tone, octave, alter), NoteLength.quarter, stem, [],
         highlight: const NoteHighlight(NoteHighlightStyle.background, Colors.blue));
 
+/// A single-measure score in C major whose only element is a highlighted quarter rest.
+Score highlightedRest() => Score([
+      Part([
+        Measure([
+          Attributes(1, MusicalKey(CircleOfFifths.C_A.v, KeyMode.major), 1,
+              [Clef(1, Clefs.G)], Time(4, 4)),
+          RestNote(1, 1, 1, [],
+              highlight:
+                  const NoteHighlight(NoteHighlightStyle.background, Colors.blue)),
+        ])
+      ])
+    ]);
+
 /// Renders [painter] over an opaque white background so semi-transparent band
 /// pixels composite to a detectable light blue.
 Future<ui.Image> render(CustomPainter painter, Size size) async {
@@ -109,6 +122,23 @@ void main() {
       await expectEnclosed('high E6', highlighted(note(BaseTones.E, 4, StemValue.down)));
       // A note inside the staff still stays enclosed (default frame, stem up).
       await expectEnclosed('mid B4', highlighted(note(BaseTones.B, 2, StemValue.up)));
+    });
+  });
+
+  testWidgets('background band wraps a rest horizontally symmetrically',
+      (tester) async {
+    await tester.runAsync(() async {
+      final (band, rest) = await boxes(highlightedRest());
+      // The rest glyph must sit inside the band...
+      expect(rest.left, greaterThanOrEqualTo(band.left - tol),
+          reason: 'rest left ${rest.left} pokes left of band ${band.left}');
+      expect(rest.right, lessThanOrEqualTo(band.right + tol),
+          reason: 'rest right ${rest.right} pokes right of band ${band.right}');
+      // ...and the left/right breathing space must be (near) equal, i.e. centred.
+      final leftGap = rest.left - band.left;
+      final rightGap = band.right - rest.right;
+      expect((leftGap - rightGap).abs(), lessThanOrEqualTo(tol + 1),
+          reason: 'asymmetric band: left gap $leftGap vs right gap $rightGap');
     });
   });
 }
