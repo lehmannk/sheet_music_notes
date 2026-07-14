@@ -95,9 +95,6 @@ Attributes? parseAttributesXML(XmlElement attributesXML) {
   }
 
   final stavesElmt = attributesXML.getElement('staves');
-  final int? staves =
-      stavesElmt != null ? int.parse(stavesElmt.innerText) : null;
-
   final clefElmts = attributesXML.findAllElements('clef');
   List<Clef>? clefs;
   if (clefElmts.isNotEmpty) {
@@ -121,6 +118,13 @@ Attributes? parseAttributesXML(XmlElement attributesXML) {
         .whereType<Clef>()
         .toList();
   }
+
+  // The MusicXML <staves> element is optional and defaults to 1 (single staff). When it is
+  // omitted, assume one staff per declared clef so single-staff parts (which never write
+  // <staves>) parse instead of being rejected.
+  final int? staves = stavesElmt != null
+      ? int.parse(stavesElmt.innerText)
+      : (clefs != null && clefs.isNotEmpty ? clefs.length : null);
 
   if ((staves ?? 0) != (clefs != null ? clefs.length : 0)) {
     throw const FormatException(
@@ -347,7 +351,8 @@ Note? parseNoteXML(XmlElement noteXML) {
       : null;
 
   final staffElmt = noteXML.getElement('staff');
-  final int? staff = staffElmt != null ? int.parse(staffElmt.innerText) : null;
+  // The MusicXML <staff> element is optional and defaults to 1 (single-staff parts omit it).
+  final int staff = staffElmt != null ? int.parse(staffElmt.innerText) : 1;
 
   final beamElmts = noteXML.findAllElements('beam');
   final beams = beamElmts.map(parseBeamXML).whereType<Beam>().toList();
@@ -360,13 +365,12 @@ Note? parseNoteXML(XmlElement noteXML) {
 
   final chord = noteXML.getElement('chord') != null;
 
-  if (rest && duration != null && staff != null) {
+  if (rest && duration != null) {
     return RestNote(duration, voice, staff, notations);
   } else if (pitch != null &&
       duration != null &&
       type != null &&
-      stem != null &&
-      staff != null) {
+      stem != null) {
     return PitchNote(
         duration, voice, staff, notations, pitch, type, stem, beams,
         dots: dots, chord: chord);
