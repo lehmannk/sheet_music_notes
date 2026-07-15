@@ -1,4 +1,6 @@
 import 'dart:ui';
+import 'package:xml/xpath.dart';
+
 import '../graphics/render-functions/staff.dart';
 import 'package:xml/xml.dart';
 import 'dart:io';
@@ -13,8 +15,12 @@ XmlDocument loadMusicXMLFile(String filePath) {
 }
 
 Score parseMusicXML(XmlDocument document) {
+  final titleNodes = document.xpath('//credit[credit-type="title"]/credit-words/text()');
+  final title = titleNodes.isNotEmpty ? titleNodes.first.value : null;
+  final subTitleNodes = document.xpath('//credit[credit-type="subtitle"]/credit-words/text()');
+  final subTitle = titleNodes.isNotEmpty ? titleNodes.first.value : null;
   final parts = document.findAllElements('part');
-  return Score(parts.map(parsePartXML).toList());
+  return Score(parts.map(parsePartXML).toList(), title: title, subTitle: subTitle);
 }
 
 Part parsePartXML(XmlElement partXML) {

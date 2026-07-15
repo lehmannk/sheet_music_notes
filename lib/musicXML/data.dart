@@ -4,7 +4,10 @@ import '../graphics/notes.dart';
 import '../graphics/render-functions/staff.dart';
 
 class Score {
-  Score(this.parts);
+  String? title;
+  String? subTitle;
+
+  Score(this.parts, {this.title, this.subTitle});
 
   final List<Part> parts;
 
