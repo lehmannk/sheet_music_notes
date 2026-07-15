@@ -18,7 +18,7 @@ Score parseMusicXML(XmlDocument document) {
   final titleNodes = document.xpath('//credit[credit-type="title"]/credit-words/text()');
   final title = titleNodes.isNotEmpty ? titleNodes.first.value : null;
   final subTitleNodes = document.xpath('//credit[credit-type="subtitle"]/credit-words/text()');
-  final subTitle = titleNodes.isNotEmpty ? titleNodes.first.value : null;
+  final subTitle = subTitleNodes.isNotEmpty ? subTitleNodes.first.value : null;
   final parts = document.findAllElements('part');
   return Score(parts.map(parsePartXML).toList(), title: title, subTitle: subTitle);
 }
